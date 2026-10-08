@@ -25,6 +25,11 @@ it downloads the module itself — so NetflixHD is a small launcher around
   website was made for a mouse, and this lets the keyboard walk its rows. Enter
   opens; in the player, Space plays and pauses, ←/→ seek, F is full screen, Esc
   steps back.
+- **Home to leave**: Home (or Ctrl+Q) closes NetflixHD — Netflix keeps Esc and
+  Backspace for "back", so the way out is the key a TV remote calls Home. When
+  it closes, [OMATVLauncher](https://github.com/FromChaosComesClarity/OMATVLauncher)
+  comes back on its own, if it is installed. (A tiny bundled extension does the
+  closing; a web page cannot close its own window.)
 - **One window**: launching it again brings the open one to the front.
 - **Hardware video decode** (VA-API) where the GPU has it.
 
@@ -38,6 +43,10 @@ it downloads the module itself — so NetflixHD is a small launcher around
 - **It is Netflix's website.** There is no public Netflix TV interface the way
   `youtube.com/tv` exists for YouTube; this is the site, made comfortable for a
   TV.
+- **Why not the Android TV app** (through Waydroid): Netflix checks that the
+  device is Google-certified and has hardware DRM before it will play, and an
+  Android container on a PC is neither — it ends in an error code, or at best
+  480p, in a much heavier stack.
 
 ## Install
 

@@ -28,6 +28,31 @@ fi
 
 mkdir -p "$PROFILE"
 
+# The Home-key extension: installed next to the profile, or beside this script
+# when run from a checkout.
+EXTENSION="$DATA/extension"
+if [[ ! -f $EXTENSION/manifest.json ]]; then
+  EXTENSION="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)/extension"
+  [[ -f $EXTENSION/manifest.json ]] || EXTENSION=""
+fi
+
+# When Netflix closes, OMATVLauncher comes back — if it is on this machine.
+# Found through its own menu entry (Settings › System › Show in system menu
+# writes it, pointing at wherever the AppImage lives), else in ~/Applications.
+# --show, not a plain launch: a plain launch toggles, and must never hide it.
+back_to_tv_home() {
+  local entry="${XDG_DATA_HOME:-$HOME/.local/share}/applications/omatvlauncher.desktop"
+  local launcher=""
+  if [[ -f $entry ]]; then
+    launcher=$(sed -n 's/^Exec="\(.*\)"$/\1/p' "$entry" | head -n1)
+  fi
+  if [[ -z $launcher || ! -x $launcher ]]; then
+    launcher=$(ls "$HOME"/Applications/OMATVLauncher*.AppImage 2>/dev/null | head -n1)
+  fi
+  [[ -n $launcher && -x $launcher ]] || return 0
+  setsid "$launcher" --show >/dev/null 2>&1 &
+}
+
 # Widevine, ready on the first launch. A fresh profile would otherwise download
 # the module in the background and refuse to play for the first few minutes.
 # Copied rather than linked: the component updater writes into this directory,
@@ -55,7 +80,14 @@ fi
 # --enable-spatial-navigation: the arrow keys move focus between the rows and
 #   tiles of Netflix's desktop site, which was made for a mouse; Enter opens.
 # VA-API decode where the GPU has it, so a two-hour film is not a CPU job.
-exec "$browser" \
+# --load-extension: the small extension that makes Home (and Ctrl+Q) close the
+#   window — the way out without Super+W. It replaces, for this profile only,
+#   whatever chromium-flags.conf loads; Omarchy's browser extensions have no
+#   business in a Netflix kiosk anyway.
+#
+# Not exec'd: this script waits for Netflix to close, then hands the screen
+# back to the TV home screen.
+"$browser" \
   --user-data-dir="$PROFILE" \
   --app="$URL" \
   --kiosk \
@@ -65,4 +97,7 @@ exec "$browser" \
   --no-default-browser-check \
   --disable-session-crashed-bubble \
   --enable-features=VaapiVideoDecoder,VaapiVideoDecodeLinuxGL,AcceleratedVideoDecodeLinuxGL \
-  "$@"
+  ${EXTENSION:+--load-extension="$EXTENSION"} \
+  "$@" || true
+
+back_to_tv_home

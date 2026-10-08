@@ -24,6 +24,7 @@ refresh_menu() {
 case "${1:-}" in
   --uninstall | --purge)
     rm -f "$bin_dest" "$icon_dest" "$entry_dest"
+    rm -rf "$profile/extension"
     refresh_menu
     if [[ $1 == --purge ]]; then
       rm -rf "$profile"
@@ -39,6 +40,9 @@ esac
 
 install -Dm755 "$here/bin/netflixhd" "$bin_dest"
 install -Dm644 "$here/assets/netflixhd.svg" "$icon_dest"
+rm -rf "$profile/extension"
+install -d "$profile/extension"
+install -m644 "$here"/extension/* "$profile/extension/"
 mkdir -p "$(dirname "$entry_dest")"
 
 # Absolute paths: a menu entry cannot count on ~/.local/bin being on the
