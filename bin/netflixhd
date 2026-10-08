@@ -1,0 +1,68 @@
+#!/bin/bash
+
+# NetflixHD — Netflix on the TV, in a frameless full-screen Chromium window.
+#
+# Not Electron, on purpose: Netflix plays only through Widevine DRM, which stock
+# Electron does not ship. Chromium does — it fetches the Widevine module itself
+# — so the whole app is this launcher around `chromium --app --kiosk`, with a
+# profile of its own so the Netflix login and settings stay out of the everyday
+# browser.
+#
+# Usage: netflixhd [extra chromium flags...]
+
+set -euo pipefail
+
+URL="https://www.netflix.com/browse"
+DATA="${XDG_DATA_HOME:-$HOME/.local/share}/netflixhd"
+PROFILE="$DATA/profile"
+
+browser=""
+for candidate in chromium google-chrome-stable google-chrome brave; do
+  if command -v "$candidate" >/dev/null 2>&1; then browser="$candidate"; break; fi
+done
+if [[ -z $browser ]]; then
+  notify-send "NetflixHD" "Needs Chromium (or Chrome/Brave) installed." 2>/dev/null || true
+  echo "netflixhd: no Chromium-based browser found" >&2
+  exit 1
+fi
+
+mkdir -p "$PROFILE"
+
+# Widevine, ready on the first launch. A fresh profile would otherwise download
+# the module in the background and refuse to play for the first few minutes.
+# Copied rather than linked: the component updater writes into this directory,
+# and two browsers updating one shared copy is a race nobody needs.
+if [[ ! -e "$PROFILE/WidevineCdm" ]]; then
+  for src in "$HOME/.config/chromium/WidevineCdm" "$HOME/.config/google-chrome/WidevineCdm" "$HOME/.config/BraveSoftware/Brave-Browser/WidevineCdm"; do
+    if [[ -d $src ]]; then cp -r "$src" "$PROFILE/WidevineCdm"; break; fi
+  done
+fi
+
+# Already open: bring it back instead of opening a second window. Found by the
+# browser's own PID, which Hyprland reports for every window, so this works
+# whatever app_id Chromium chooses to give a kiosk window.
+pid=$(pgrep -o -f -- "--user-data-dir=$PROFILE" || true)
+if [[ -n $pid ]] && command -v hyprctl >/dev/null 2>&1 && command -v jq >/dev/null 2>&1; then
+  address=$(hyprctl clients -j | jq -r --argjson p "$pid" '.[] | select(.pid == $p) | .address' | head -n1)
+  if [[ -n $address ]]; then
+    hyprctl dispatch "hl.dsp.focus({ window = \"address:$address\" })" >/dev/null 2>&1 ||
+      hyprctl dispatch focuswindow "address:$address" >/dev/null 2>&1
+    exit 0
+  fi
+fi
+
+# --kiosk: full screen, no tabs, no address bar, no way to wander off.
+# --enable-spatial-navigation: the arrow keys move focus between the rows and
+#   tiles of Netflix's desktop site, which was made for a mouse; Enter opens.
+# VA-API decode where the GPU has it, so a two-hour film is not a CPU job.
+exec "$browser" \
+  --user-data-dir="$PROFILE" \
+  --app="$URL" \
+  --kiosk \
+  --class=NetflixHD \
+  --enable-spatial-navigation \
+  --no-first-run \
+  --no-default-browser-check \
+  --disable-session-crashed-bubble \
+  --enable-features=VaapiVideoDecoder,VaapiVideoDecodeLinuxGL,AcceleratedVideoDecodeLinuxGL \
+  "$@"
